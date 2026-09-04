@@ -1,7 +1,7 @@
 COBC ?= cobc
 PROGRAM := hello
 
-.PHONY: all run clean
+.PHONY: all run clean help
 
 all: $(PROGRAM)
 
@@ -13,3 +13,11 @@ run: $(PROGRAM)
 
 clean:
 	$(RM) $(PROGRAM)
+
+help:
+	@printf '%s\n' \
+		'Targets:' \
+		'  all    Build hello' \
+		'  run    Build and run hello' \
+		'  clean  Remove hello' \
+		'  help   Show this help'
