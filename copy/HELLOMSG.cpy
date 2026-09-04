@@ -1,0 +1,2 @@
+       01  HELLO-RESPONSE.
+           05  HELLO-MESSAGE PIC X(13).
