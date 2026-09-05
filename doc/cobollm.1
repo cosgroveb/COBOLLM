@@ -1,0 +1,162 @@
+.TH COBOLLM 1 "September 2026" "COBOLLM" "User Commands"
+.SH NAME
+cobollm \- run a small unsandboxed coding agent written in COBOL
+.SH SYNOPSIS
+.SS GNU/Linux
+.B cobollm
+.I TASK
+.SH DESCRIPTION
+.B cobollm
+sends one task to an OpenAI-compatible Responses endpoint.
+The model can call one custom tool named
+.BR shell .
+Each tool call starts a fresh
+.B /bin/sh
+in the current directory.
+Shell-local state does not survive between calls, but filesystem changes do.
+.PP
+The shell runs with the COBOLLM process user's permissions.
+COBOLLM has no sandbox, permission check, confirmation prompt, or command
+timeout.
+Model-supplied commands can read, change, and delete any data available to that
+user.
+.PP
+COBOLLM keeps one session in process memory.
+It sends accepted Responses output items and shell results back on later turns
+with
+.BR store:false .
+It does not stream, save sessions, or resume a prior session.
+.SH ARGUMENTS
+.TP
+.I TASK
+Exactly one nonempty GNU/Linux command-line argument.
+The maximum length is 65,535 bytes.
+.SH INPUT
+.TP
+.B TASK DD
+On z/OS, a protected USS regular byte file containing 1 through 65,535 native
+IBM-1047 bytes.
+Spaces, newlines, and trailing bytes are preserved.
+A 65,536th byte is rejected.
+.SH ENVIRONMENT
+.TP
+.B OPENAI_API_KEY
+Required bearer token, limited to 8,192 printable ASCII bytes without spaces.
+COBOLLM removes this variable from the child environment before running a
+shell command.
+The key remains in parent process memory until cleanup, and a same-user command
+may be able to inspect that process.
+.TP
+.B OPENAI_MODEL
+Required model identifier, limited to 256 bytes.
+.B gpt-5.3-codex
+is an example.
+Its availability depends on the endpoint and account.
+.TP
+.B OPENAI_BASE_URL
+Optional Responses base URL, limited to 2,048 bytes.
+The default is
+.BR https://api.openai.com/v1 .
+COBOLLM strips trailing path slashes and appends
+.BR /responses .
+.PP
+The z/OS run JCL reads these values from a protected
+.B RUNENV
+data set allocated with RECFM=V and LRECL 8211 or larger.
+Each record contains one native IBM-1047
+.B NAME=value
+entry.
+CEEOPTS forces
+.B _BPXK_AUTOCVT=OFF
+outside RUNENV to preserve the native task bytes.
+.SH ENDPOINT
+The URL parser accepts an HTTP or HTTPS URL with an ASCII DNS hostname,
+optional port, and optional origin path.
+It rejects IP literals, user information, query strings, fragments,
+backslashes, whitespace, non-ASCII bytes, and invalid DNS labels.
+.PP
+GNU HTTPS uses OpenSSL 3 default trust paths, SNI, certificate-chain
+verification, and hostname verification.
+GNU plain HTTP is permitted with a warning.
+The z/OS target rejects plain HTTP.
+Before writing HTTP, it requires AT-TLS to report policy enabled, connection
+secure, security type client, and an allowed protocol and cipher.
+Policy provenance is a separate mandatory deployment gate.
+.SH RESPONSES PROTOCOL
+Each request sets
+.BR store:false ,
+.BR parallel_tool_calls:false ,
+and requests
+.BR reasoning.encrypted_content .
+It advertises one custom free-form tool named
+.BR shell .
+.PP
+COBOLLM accepts reasoning items, custom shell calls, and completed assistant
+messages from the endpoint.
+It rejects parallel calls and unsupported output shapes.
+.SH LIMITS
+.TP
+Shell command
+65,535 bytes.
+.TP
+Shell output
+1 MiB after UTF-8 conversion.
+.TP
+Final response
+1 MiB of UTF-8.
+.TP
+HTTP response body
+8 MiB.
+.TP
+Conversation history and request body
+16 MiB each.
+.TP
+HTTP response headers
+64 KiB.
+.TP
+JSON nesting
+64 levels.
+.SH OUTPUT
+COBOLLM writes shell activity and diagnostics to standard error.
+It merges shell standard error into shell standard output and returns both to
+the model.
+The final model response goes to standard output.
+.SH EXIT STATUS
+.TP
+.B 0
+The model returned a final response and COBOLLM wrote it successfully.
+.TP
+.B 1
+Internal invariant or output failure.
+.TP
+.B 2
+Usage or configuration failure.
+.TP
+.B 3
+HTTP, JSON, or Responses protocol failure.
+.TP
+.B 4
+Network or TLS failure.
+.TP
+.B 5
+Shell runtime failure.
+.TP
+.B 6
+Fixed capacity or text-conversion failure.
+.SH SECURITY
+Run COBOLLM only inside an environment that can tolerate arbitrary commands
+from the configured endpoint.
+Removing
+.B OPENAI_API_KEY
+from the shell environment does not isolate the parent process or protect other
+same-user credentials and files.
+.SH PLATFORM STATUS
+The GNU build supports one checked Linux/aarch64 ABI family.
+The z/OS build JCL is configured to compile RENT objects and bind one MVS
+program object with
+.BR REUS(NONE) .
+Separate run JCL is configured to launch it directly from MVS batch with
+.BR POSIX(ON) .
+Nobody has compiled, bound, or run these artifacts on z/OS.
+.SH SEE ALSO
+.BR sh (1)
