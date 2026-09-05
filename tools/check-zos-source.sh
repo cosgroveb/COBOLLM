@@ -74,28 +74,40 @@ resolve_line=$(grep -n 'ZN-GETADDRINFO' zos/netio.cob |
 grep -q 'MOVE TEXT-UTF8-STRICT TO TP-OPERATION' zos/netio.cob ||
     fail 'z/OS hostname conversion is not strict'
 
-grep -q 'LK-LENGTH-PTR(2) = NULL' zos/launch.cob ||
-    fail 'launcher length pointer check missing'
-grep -q 'LK-VALUE-PTR(2) = NULL' zos/launch.cob ||
-    fail 'launcher value pointer check missing'
-grep -q 'LK-ARG-LENGTH > LIMIT-ZOS-ARGV' zos/launch.cob ||
-    fail 'launcher pre-index length bound missing'
-grep -q 'MOVE STATUS-INTERNAL TO CLI-STATUS' zos/launch.cob ||
-    fail 'launcher malformed-native-input status missing'
-grep -A10 '^       TEST-BAD-TERMINATOR[.]$' test/tstzlaunch.cob |
-    grep -q 'STATUS-INTERNAL' ||
-    fail 'launcher terminator fixture has wrong status category'
-grep -q '^       TEST-NATIVE-LENGTHS[.]$' test/tstzlaunch.cob ||
-    fail 'launcher native-length fixtures are missing'
-grep -A35 '^       TEST-NATIVE-LENGTHS[.]$' test/tstzlaunch.cob |
-    grep -q 'MOVE -1 TO WS-ARG-LENGTH' ||
-    fail 'launcher negative native-length fixture is missing'
-length_guard=$(grep -n 'LK-ARG-LENGTH < 1' zos/launch.cob |
-    cut -d: -f1)
-value_address=$(grep -n 'SET ADDRESS OF LK-ARG-VALUE' zos/launch.cob |
-    cut -d: -f1)
-[ "$length_guard" -lt "$value_address" ] ||
-    fail 'launcher indexes native value before validating length'
+for function in fopen fread ferror feof fclose; do
+    grep -q "CALL \"$function\"" zos/launch.cob ||
+        fail "launcher does not call LE $function"
+done
+grep -q 'WS-TASK-DD PIC X(8) VALUE X"C4C47AE3C1E2D200"' \
+    zos/launch.cob || fail 'launcher does not open DD:TASK'
+grep -q 'WS-READ-MODE PIC X(3) VALUE X"998200"' zos/launch.cob ||
+    fail 'launcher does not request binary read mode'
+grep -q 'WS-TASK-BUFFER PIC X(65536)' zos/launch.cob ||
+    fail 'launcher does not probe the first overflow byte'
+grep -q 'WS-TOTAL > LIMIT-TASK' zos/launch.cob ||
+    fail 'launcher task capacity check is missing'
+grep -q 'MOVE LOW-VALUES TO WS-TASK-BUFFER' zos/launch.cob ||
+    fail 'launcher does not erase task staging'
+if grep -q 'PROCEDURE DIVISION USING' zos/launch.cob; then
+    fail 'launcher still accepts an argv linkage'
+fi
+for fixture in TEST-EXACT-BYTES TEST-CHUNKED TEST-EMPTY TEST-MINIMUM \
+    TEST-BOUNDARY-MINUS TEST-BOUNDARY TEST-OVERFLOW TEST-OPEN-FAILURE \
+    TEST-READ-FAILURE TEST-ZERO-PROGRESS TEST-CLOSE-FAILURE; do
+    grep -q "^       $fixture[.]$" test/tstzlaunch.cob ||
+        fail "launcher fixture is missing: $fixture"
+done
+grep -A9 '^       TEST-EMPTY[.]$' test/tstzlaunch.cob |
+    grep -q 'ZF-STATUS NOT = STATUS-OK' ||
+    fail 'empty TASK must reach COBOLLM as successful launcher input'
+if grep -q 'STATUS-USAGE-TEXT' zos/launch.cob; then
+    fail 'launcher must not classify an empty TASK as invalid text'
+fi
+grep -A12 '^       TEST-BOUNDARY-MINUS[.]$' test/tstzlaunch.cob |
+    grep -q 'ZF-TASK-LENGTH NOT = 65534' ||
+    fail 'launcher minus-one task boundary fixture differs'
+grep -q 'X"40C10025C240"' test/tstzlaunch.cob ||
+    fail 'launcher exact-byte fixture is missing'
 
 grep -q 'PERFORM VALIDATE-PARAMETERS' zos/netio.cob ||
     fail 'z/OS network parameter validation is not centralized'
@@ -202,6 +214,61 @@ for job in zos/build.jcl zos/test.jcl zos/tsttls.jcl; do
         fail "$job compiler cannot resolve z/OS adapter copybooks"
 done
 
+bind_options='REUS(NONE),AMODE=31,RMODE=ANY,MAP,XREF,LIST'
+[ "$(grep -Fc "PARM='$bind_options'" zos/build.jcl)" -eq 1 ] ||
+    fail 'production bind options differ'
+[ "$(grep -c '^//BIND ' zos/build.jcl)" -eq 1 ] ||
+    fail 'production build must contain one bind step'
+[ "$(grep -c '^//SYSLMOD ' zos/build.jcl)" -eq 1 ] ||
+    fail 'production build must contain one program-object output'
+grep -q 'COBOLLM.LOAD(COBOLLM)' zos/build.jcl ||
+    fail 'production PDSE output was removed'
+if grep -Eq 'BINDUSS|USSOUT|SYSLMOD  DD PATH=' zos/build.jcl; then
+    fail 'production build still creates a USS executable'
+fi
+grep -q '^//RUN      EXEC PGM=COBOLLM,REGION=0M,TIME=NOLIMIT$' \
+    zos/run.jcl || fail 'production direct MVS invocation differs'
+grep -q '^//STEPLIB  DD DISP=SHR,DSN=&HLQ..COBOLLM.LOAD$' \
+    zos/run.jcl || fail 'production run load library differs'
+[ "$(grep -c '^POSIX(ON),$' zos/run.jcl)" -eq 1 ] ||
+    fail 'production POSIX option differs'
+grep -q '^ENVAR("_BPXK_AUTOCVT=OFF","_CEE_ENVFILE=DD:RUNENV")$' \
+    zos/run.jcl || fail 'production LE environment options differ'
+grep -q '^//RUNENV   DD DISP=SHR,DSN=&ENVDSN$' zos/run.jcl ||
+    fail 'production protected environment handoff is missing'
+grep -q '^//TASK     DD PATH='"'"'&TASKFILE'"'"',PATHOPTS=(ORDONLY)$' \
+    zos/run.jcl || fail 'production TASK byte stream differs'
+for ddname in SYSPRINT SYSOUT; do
+    grep -q "^//$ddname .*DD SYSOUT=\*$" zos/run.jcl ||
+        fail "production output DD is missing: $ddname"
+done
+if grep -Eq 'BPXBATCH|BPXBATSL|STDPARM|STDIN' zos/run.jcl; then
+    fail 'production run still uses a BPX launcher contract'
+fi
+for step in RSHELL RZOUT; do
+    step_options=$(grep -A5 "^//$step " zos/test.jcl)
+    printf '%s\n' "$step_options" | grep -q '^//CEEOPTS  DD \*$' ||
+        fail "$step target test does not supply CEEOPTS"
+    printf '%s\n' "$step_options" |
+        grep -q '^POSIX(ON),ENVAR("_BPXK_AUTOCVT=OFF")$' ||
+        fail "$step target test LE options differ"
+done
+for step in POSITIVE MISMATCH; do
+    step_options=$(grep -A7 "^//$step " zos/tsttls.jcl)
+    printf '%s\n' "$step_options" | grep -q '^//CEEOPTS  DD \*$' ||
+        fail "$step live TLS test does not supply CEEOPTS"
+    printf '%s\n' "$step_options" | grep -q '^POSIX(ON),$' ||
+        fail "$step live TLS test does not enable POSIX"
+    printf '%s\n' "$step_options" |
+        grep -q '^ENVAR("_BPXK_AUTOCVT=OFF",' ||
+        fail "$step live TLS test enables automatic conversion"
+done
+run_job=$(sed -n '1s|^//\([^ ]*\).*|\1|p' zos/run.jcl)
+policy_job=$(awk '$1 == "Jobname" { print $2; exit }' \
+    zos/attls.policy.example)
+[ "$run_job" = "$policy_job" ] ||
+    fail 'run job name differs from example AT-TLS policy'
+
 for member in TSTCNTR TSTJSON TSTHTTP TSTRESP TSTZTXT TSTSHELL \
     TSTZAGT TSTZLCH TSTZNET TSTZOUT TSTZBYTE; do
     grep -q "EXEC COB,MEMBER=$member" zos/test.jcl ||
@@ -269,10 +336,15 @@ grep -q 'WS-OP FROM TEXT-NATIVE-STRICT BY 1' test/tstztext.cob ||
 grep -q '^       ASSERT-INPUTS-PRESERVED[.]$' test/tstztext.cob ||
     fail 'z/OS text target does not verify input preservation'
 for member in FHTTP FNET FRESP FSHELL FOUTPUT FCOBOL FEZAS FSIGNAL \
-    FNATUTF8; do
+    FNATUTF8 FZLIO; do
     grep -q "EXEC COB,MEMBER=$member" zos/test.jcl ||
         fail "$member fake compile step missing"
 done
+grep -A5 '^//LZLCH' zos/test.jcl | grep -q 'TESTOBJ(FZLIO)' ||
+    fail 'z/OS launcher test does not link fake LE stdio'
+grep -Fq '| `test/fakes/zlaunchio.cob` | `YOURHLQ.COBOLLM.TESTCOB(FZLIO)` | TEST |' \
+    docs/reference/zos-staging-manifest.md ||
+    fail 'z/OS staging manifest omits fake LE stdio'
 grep -A10 '^//LAGENT' zos/test.jcl | grep -q 'TESTOBJ(FNATUTF8)' ||
     fail 'z/OS orchestration test does not link deterministic text fake'
 grep -A3 '^//LTEXT' zos/test.jcl | grep -q 'OBJ(NATUTF8)' ||

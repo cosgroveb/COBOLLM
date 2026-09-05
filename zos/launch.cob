@@ -5,70 +5,90 @@
        WORKING-STORAGE SECTION.
        COPY LIMITS.
        COPY CLIPARM.
-       01 WS-CONTENT-LENGTH       PIC S9(9) COMP-5.
+       COPY POSIXNAT.
+       01 WS-TASK-DD PIC X(8) VALUE X"C4C47AE3C1E2D200".
+       01 WS-READ-MODE PIC X(3) VALUE X"998200".
+       01 WS-TASK-BUFFER PIC X(65536).
+       01 WS-READ-PTR USAGE POINTER.
+       01 WS-COUNT PIC 9(9) COMP-5.
+       01 WS-WANT PIC 9(9) COMP-5.
+       01 WS-TOTAL PIC 9(9) COMP-5.
+       01 WS-INT-RESULT PIC S9(9) COMP-5.
+       01 WS-DONE PIC X.
+       01 WS-FAILED PIC X.
 
-       LINKAGE SECTION.
-       01 LK-ARGC                 PIC S9(9) COMP-5.
-       01 LK-LENGTH-ARRAY.
-           05 LK-LENGTH-PTR       USAGE POINTER OCCURS 65536 TIMES.
-       01 LK-VALUE-ARRAY.
-           05 LK-VALUE-PTR        USAGE POINTER OCCURS 65536 TIMES.
-       01 LK-ARG-LENGTH           PIC S9(9) COMP-5.
-       01 LK-ARG-VALUE            PIC X(65536).
-
-       PROCEDURE DIVISION USING LK-ARGC LK-LENGTH-ARRAY
-           LK-VALUE-ARRAY.
+       PROCEDURE DIVISION.
            INITIALIZE CLI-PARM
            MOVE PLATFORM-ZOS TO CLI-PLATFORM
-           IF LK-ARGC < 1 OR LK-ARGC > LIMIT-ZOS-ARGV
-               MOVE STATUS-INTERNAL TO CLI-STATUS
-               MOVE ZERO TO CLI-ARG-COUNT
+           MOVE 1 TO CLI-ARG-COUNT
+           MOVE LOW-VALUES TO WS-TASK-BUFFER
+           SET ZOS-STREAM-PTR WS-READ-PTR TO NULL
+           MOVE ZERO TO WS-TOTAL
+           MOVE FLAG-OFF TO WS-DONE WS-FAILED
+           CALL "fopen" USING
+               BY VALUE ADDRESS OF WS-TASK-DD
+               BY VALUE ADDRESS OF WS-READ-MODE
+               RETURNING ZOS-STREAM-PTR
+           IF ZOS-STREAM-PTR = NULL
+               MOVE FLAG-ON TO WS-FAILED
            ELSE
-               COMPUTE CLI-ARG-COUNT = LK-ARGC - 1
+               PERFORM READ-TASK
+               CALL "fclose" USING BY VALUE ZOS-STREAM-PTR
+                   RETURNING WS-INT-RESULT
+               SET ZOS-STREAM-PTR TO NULL
+               IF WS-INT-RESULT NOT = ZERO
+                   MOVE FLAG-ON TO WS-FAILED
+               END-IF
            END-IF
-           IF CLI-STATUS = STATUS-OK AND CLI-ARG-COUNT = 1
-               IF LK-LENGTH-PTR(2) = NULL OR
-                  LK-VALUE-PTR(2) = NULL
-                   MOVE STATUS-INTERNAL TO CLI-STATUS
+           IF WS-FAILED = FLAG-ON
+               MOVE STATUS-INTERNAL TO CLI-STATUS
+           ELSE
+               IF WS-TOTAL > LIMIT-TASK
+                   MOVE STATUS-CAPACITY TO CLI-STATUS
                ELSE
-                   SET ADDRESS OF LK-ARG-LENGTH TO
-                       LK-LENGTH-PTR(2)
-                   IF LK-ARG-LENGTH < 1
-                       MOVE STATUS-INTERNAL TO CLI-STATUS
-                   ELSE
-                       IF LK-ARG-LENGTH > LIMIT-ZOS-ARGV
-                           MOVE STATUS-CAPACITY TO CLI-STATUS
-                       ELSE
-                           SET ADDRESS OF LK-ARG-VALUE TO
-                               LK-VALUE-PTR(2)
-                       END-IF
-                       IF CLI-STATUS = STATUS-OK
-                           IF LK-ARG-VALUE(LK-ARG-LENGTH:1) = X"00"
-                               COMPUTE WS-CONTENT-LENGTH =
-                                   LK-ARG-LENGTH - 1
-                               PERFORM UNTIL
-                                   WS-CONTENT-LENGTH = ZERO OR
-                                   LK-ARG-VALUE(
-                                       WS-CONTENT-LENGTH:1)
-                                       NOT = SPACE
-                                   SUBTRACT 1 FROM WS-CONTENT-LENGTH
-                               END-PERFORM
-                               MOVE WS-CONTENT-LENGTH TO
-                                   CLI-TASK-LENGTH
-                               IF WS-CONTENT-LENGTH > ZERO
-                                   MOVE LK-ARG-VALUE(
-                                       1:WS-CONTENT-LENGTH) TO
-                                       CLI-TASK(1:WS-CONTENT-LENGTH)
-                               END-IF
-                           ELSE
-                               MOVE STATUS-INTERNAL TO CLI-STATUS
-                           END-IF
-                       END-IF
+                   MOVE WS-TOTAL TO CLI-TASK-LENGTH
+                   IF WS-TOTAL > ZERO
+                       MOVE WS-TASK-BUFFER(1:WS-TOTAL) TO
+                           CLI-TASK(1:WS-TOTAL)
                    END-IF
                END-IF
            END-IF
+           MOVE LOW-VALUES TO WS-TASK-BUFFER
+           SET WS-READ-PTR TO NULL
            CALL "COBOLLM" USING CLI-PARM
            MOVE CLI-EXIT-CODE TO RETURN-CODE
            GOBACK.
+
+       READ-TASK.
+           PERFORM UNTIL WS-DONE = FLAG-ON
+               COMPUTE WS-WANT = 65536 - WS-TOTAL
+               SET WS-READ-PTR TO ADDRESS OF WS-TASK-BUFFER
+               SET WS-READ-PTR UP BY WS-TOTAL
+               CALL "fread" USING
+                   BY VALUE WS-READ-PTR BY VALUE 1 BY VALUE WS-WANT
+                   BY VALUE ZOS-STREAM-PTR RETURNING WS-COUNT
+               EVALUATE TRUE
+                   WHEN WS-COUNT > WS-WANT
+                       MOVE FLAG-ON TO WS-FAILED WS-DONE
+                   WHEN WS-COUNT > ZERO
+                       ADD WS-COUNT TO WS-TOTAL
+                       IF WS-TOTAL = 65536
+                           MOVE FLAG-ON TO WS-DONE
+                       END-IF
+                   WHEN OTHER
+                       CALL "ferror" USING BY VALUE ZOS-STREAM-PTR
+                           RETURNING WS-INT-RESULT
+                       IF WS-INT-RESULT NOT = ZERO
+                           MOVE FLAG-ON TO WS-FAILED WS-DONE
+                       ELSE
+                           CALL "feof" USING BY VALUE ZOS-STREAM-PTR
+                               RETURNING WS-INT-RESULT
+                           IF WS-INT-RESULT = ZERO
+                               MOVE FLAG-ON TO WS-FAILED
+                           END-IF
+                           MOVE FLAG-ON TO WS-DONE
+                       END-IF
+               END-EVALUATE
+           END-PERFORM.
 
        END PROGRAM ZOSLNCHR.

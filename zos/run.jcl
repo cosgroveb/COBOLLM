@@ -1,0 +1,18 @@
+//COBOLLM  JOB
+//* Set site JOB card, HLQ, ENVDSN, TASKFILE, and AT-TLS policy.
+//         SET HLQ=YOURHLQ
+//         SET ENVDSN=YOURHLQ.COBOLLM.RUNENV
+//         SET TASKFILE=/u/site/cobollm/task.ibm1047
+//RUN      EXEC PGM=COBOLLM,REGION=0M,TIME=NOLIMIT
+//STEPLIB  DD DISP=SHR,DSN=&HLQ..COBOLLM.LOAD
+//* POSIX(ON) is required by popen. RUNENV is a protected RECFM=V file.
+//CEEOPTS  DD *
+POSIX(ON),
+ENVAR("_BPXK_AUTOCVT=OFF","_CEE_ENVFILE=DD:RUNENV")
+/*
+//RUNENV   DD DISP=SHR,DSN=&ENVDSN
+//* TASKFILE is a protected USS byte file encoded as IBM-1047.
+//TASK     DD PATH='&TASKFILE',PATHOPTS=(ORDONLY)
+//SYSPRINT DD SYSOUT=*
+//SYSOUT   DD SYSOUT=*
+//
