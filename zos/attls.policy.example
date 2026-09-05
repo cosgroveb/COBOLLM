@@ -1,0 +1,44 @@
+TTLSRule COBOLLMRule
+{
+  Jobname COBOLLM
+  RemotePortRange 443
+  Direction Outbound
+  TTLSGroupActionRef COBOLLMGroup
+  TTLSEnvironmentActionRef COBOLLMEnvironment
+}
+
+TTLSGroupAction COBOLLMGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction COBOLLMEnvironment
+{
+  HandshakeRole Client
+  TTLSKeyringParms
+  {
+    Keyring SITEUSER/SITERING
+  }
+  TTLSCipherParmsRef COBOLLMCiphers
+  TTLSEnvironmentAdvancedParmsRef COBOLLMAdvanced
+}
+
+TTLSEnvironmentAdvancedParms COBOLLMAdvanced
+{
+  SSLv2 Off
+  SSLv3 Off
+  TLSv1 Off
+  TLSv1.1 Off
+  TLSv1.2 On
+  TLSv1.3 On
+  ClientHandshakeSNI Required
+  ClientHandshakeSNIMatch Required
+  ClientHandshakeSNIList api.openai.com
+  HostReferenceIdDNS api.openai.com
+  HostRefWildcardValidation On
+}
+
+TTLSCipherParms COBOLLMCiphers
+{
+  V3CipherSuites4Char 1301C02F
+}

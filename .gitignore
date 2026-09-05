@@ -1,2 +1,7 @@
-/hello
-/test-hello
+/build/
+/cobollm
+/*.lst
+/*.map
+/*.request
+/*.response
+/*.secret

@@ -1,0 +1,62 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. "sigaction".
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       COPY SIGFCTRL.
+       01 FS-RESULT PIC S9(9) COMP-5.
+
+       LINKAGE SECTION.
+       01 FS-SIGNAL PIC S9(9) COMP-5.
+       01 FS-ACTION USAGE POINTER.
+       01 FS-OLD-ACTION USAGE POINTER.
+       01 FS-OLD-VIEW PIC X(16) BASED.
+
+       PROCEDURE DIVISION USING
+           BY VALUE FS-SIGNAL
+           BY VALUE FS-ACTION
+           BY VALUE FS-OLD-ACTION.
+           ADD 1 TO SF-ACTION-COUNT
+           MOVE ZERO TO FS-RESULT
+           EVALUATE TRUE
+               WHEN FS-ACTION = NULL AND FS-OLD-ACTION NOT = NULL
+                   MOVE "Q" TO SF-TRACE(SF-TRACE-LENGTH + 1:1)
+                   SET ADDRESS OF FS-OLD-VIEW TO FS-OLD-ACTION
+                   MOVE LOW-VALUES TO FS-OLD-VIEW
+               WHEN SF-MODE = 1 OR SF-MODE = 2 OR
+                    SF-ACTION-COUNT > 2
+                   MOVE "R" TO SF-TRACE(SF-TRACE-LENGTH + 1:1)
+                   IF SF-MODE = 2 MOVE -1 TO FS-RESULT END-IF
+               WHEN OTHER
+                   MOVE "I" TO SF-TRACE(SF-TRACE-LENGTH + 1:1)
+           END-EVALUATE
+           ADD 1 TO SF-TRACE-LENGTH
+           IF FS-SIGNAL NOT = 13 MOVE -1 TO FS-RESULT END-IF
+           GOBACK RETURNING FS-RESULT.
+
+       END PROGRAM "sigaction".
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. "sigemptyset".
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       COPY SIGFCTRL.
+       01 FE-RESULT PIC S9(9) COMP-5.
+
+       LINKAGE SECTION.
+       01 FE-MASK PIC X(8).
+
+       PROCEDURE DIVISION USING BY REFERENCE FE-MASK.
+           ADD 1 TO SF-EMPTY-COUNT
+           MOVE "E" TO SF-TRACE(SF-TRACE-LENGTH + 1:1)
+           ADD 1 TO SF-TRACE-LENGTH
+           MOVE LOW-VALUES TO FE-MASK
+           IF SF-MODE = 1 OR SF-MODE = 2
+               MOVE -1 TO FE-RESULT
+           ELSE
+               MOVE ZERO TO FE-RESULT
+           END-IF
+           GOBACK RETURNING FE-RESULT.
+
+       END PROGRAM "sigemptyset".

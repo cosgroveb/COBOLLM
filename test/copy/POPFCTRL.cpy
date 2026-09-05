@@ -1,0 +1,4 @@
+       01 FAKE-POPEN-CONTROL EXTERNAL.
+          05 FP-CALL-COUNT          PIC S9(9) COMP-5.
+          05 FP-EXPECTED-LENGTH     PIC S9(9) COMP-5.
+          05 FP-STAGING-VALID       PIC X.

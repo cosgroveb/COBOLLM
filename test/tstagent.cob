@@ -1,0 +1,898 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. TSTAGENT.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       COPY LIMITS.
+       COPY CLIPARM.
+       COPY TXTPARM.
+       COPY FRCTRL.
+       COPY FSCTRL.
+       COPY FOCTRL.
+       01  WS-KEY-NAME.
+           05 FILLER PIC X(14) VALUE "OPENAI_API_KEY".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01  WS-MODEL-NAME.
+           05 FILLER PIC X(12) VALUE "OPENAI_MODEL".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01  WS-URL-NAME.
+           05 FILLER PIC X(15) VALUE "OPENAI_BASE_URL".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01  WS-SENTINEL-NAME.
+           05 FILLER PIC X(17) VALUE "COBOLLM_SENTINEL".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01  WS-KEY-VALUE.
+           05 FILLER PIC X(11) VALUE "test-secret".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01  WS-MODEL-VALUE.
+           05 FILLER PIC X(8) VALUE "gpt-test".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01  WS-HTTPS-VALUE.
+           05 FILLER PIC X(15) VALUE "https://example".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01  WS-HTTP-VALUE.
+           05 FILLER PIC X(14) VALUE "http://example".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01  WS-SENTINEL-VALUE.
+           05 FILLER PIC X(4) VALUE "keep".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01  WS-EMPTY-VALUE PIC X VALUE LOW-VALUE.
+       01  WS-OVERWRITE PIC S9(9) COMP-5 VALUE 1.
+       01  WS-NATIVE-RESULT PIC S9(9) COMP-5.
+       01  WS-ENV-PTR USAGE POINTER.
+       01  WS-FAILURES PIC S9(9) COMP-5 VALUE ZERO.
+       01  WS-BEFORE PIC S9(9) COMP-5 VALUE ZERO.
+       01  WS-TALLY PIC S9(9) COMP-5.
+       01  WS-PREFIX-LENGTH PIC S9(9) COMP-5.
+       01  WS-EXPECTED-LENGTH PIC S9(9) COMP-5.
+       01  WS-EXPECTED-STDERR PIC X(256).
+       01  C-HAPPY-STDERR.
+           05 FILLER PIC X(22) VALUE "COBOLLM shell command:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(9) VALUE "printf ok".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(21) VALUE "COBOLLM shell result:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(11) VALUE "status=exit".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(11) VALUE "exit_code=0".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(11) VALUE "signal=none".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(15) VALUE "truncated=false".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(19) VALUE "encoding_loss=false".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(7) VALUE "output:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(12) VALUE "shell output".
+           05 FILLER PIC X VALUE X"0A".
+       01  C-ENCODING-STDERR.
+           05 FILLER PIC X(22) VALUE "COBOLLM shell command:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(37) VALUE
+               "[command unavailable: encoding error]".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(21) VALUE "COBOLLM shell result:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(29) VALUE
+               "status=command-encoding-error".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(14) VALUE "exit_code=none".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(11) VALUE "signal=none".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(15) VALUE "truncated=false".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(19) VALUE "encoding_loss=false".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(7) VALUE "output:".
+           05 FILLER PIC X VALUE X"0A".
+       01  C-ZOS-ENCODING-STDERR.
+           05 FILLER PIC X(22) VALUE "COBOLLM shell command:".
+           05 FILLER PIC X VALUE X"25".
+           05 FILLER PIC X(37) VALUE
+               "[command unavailable: encoding error]".
+           05 FILLER PIC X VALUE X"25".
+           05 FILLER PIC X(21) VALUE "COBOLLM shell result:".
+           05 FILLER PIC X VALUE X"25".
+           05 FILLER PIC X(29) VALUE
+               "status=command-encoding-error".
+           05 FILLER PIC X VALUE X"25".
+           05 FILLER PIC X(14) VALUE "exit_code=none".
+           05 FILLER PIC X VALUE X"25".
+           05 FILLER PIC X(11) VALUE "signal=none".
+           05 FILLER PIC X VALUE X"25".
+           05 FILLER PIC X(15) VALUE "truncated=false".
+           05 FILLER PIC X VALUE X"25".
+           05 FILLER PIC X(19) VALUE "encoding_loss=false".
+           05 FILLER PIC X VALUE X"25".
+           05 FILLER PIC X(7) VALUE "output:".
+           05 FILLER PIC X VALUE X"25".
+       01  C-OUTPUT-FAIL-DIAG.
+           05 FILLER PIC X(38) VALUE
+               "COBOLLM: internal: output write failed".
+           05 FILLER PIC X VALUE X"0A".
+       01  C-LOSS-STDERR.
+           05 FILLER PIC X(22) VALUE "COBOLLM shell command:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(9) VALUE "printf ok".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(21) VALUE "COBOLLM shell result:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(11) VALUE "status=exit".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(11) VALUE "exit_code=0".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(11) VALUE "signal=none".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(15) VALUE "truncated=false".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(18) VALUE "encoding_loss=true".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(7) VALUE "output:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(4) VALUE X"EFBFBD0A".
+       01  C-SIGNAL-STDERR.
+           05 FILLER PIC X(22) VALUE "COBOLLM shell command:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(9) VALUE "printf ok".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(21) VALUE "COBOLLM shell result:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(13) VALUE "status=signal".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(14) VALUE "exit_code=none".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(9) VALUE "signal=15".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(14) VALUE "truncated=true".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(19) VALUE "encoding_loss=false".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(7) VALUE "output:".
+           05 FILLER PIC X VALUE X"0A".
+           05 FILLER PIC X(12) VALUE "shell output".
+           05 FILLER PIC X VALUE X"0A".
+       01  WS-UNREPRESENTABLE PIC X(4) VALUE X"F09F9880".
+       01  WS-CONVERSION-OUTPUT PIC X(16).
+       01  WS-LONG-ENV PIC X(8194).
+       01  WS-BAD-KEY.
+           05 FILLER PIC X(7) VALUE "bad key".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01  WS-EXPECTED-EXIT PIC S9(9) COMP-5.
+       01  WS-EXPECTED-CALLS PIC S9(9) COMP-5.
+
+       LINKAGE SECTION.
+       01  WS-ENV-VIEW PIC X(32).
+
+       PROCEDURE DIVISION.
+           PERFORM TEST-HAPPY-PATH
+           IF WS-FAILURES > ZERO DISPLAY "FAIL AGENT HAPPY" END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-COMMAND-ENCODING
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT COMMAND"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-ZOS-UNREPRESENTABLE
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT ZOS TEXT"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-ACTIVITY-NEWLINES
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT NEWLINES"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-ACTIVITY-ENCODING
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT ENCODING"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-ACTIVITY-SIGNAL
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT SIGNAL"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-SHELL-FAILURE
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT SHELL"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-RESPONSES-FAILURES
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT RESPONSE"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-FINAL-REPLACEMENT
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT FINAL"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-DEFAULT-URL
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT DEFAULT URL"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-PLAINTEXT-GNU
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT HTTP"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-PLAINTEXT-ZOS
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT ZOS"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-OUTPUT-FAILURE
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT OUTPUT"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-MISSING-KEY
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT KEY"
+           END-IF
+           MOVE WS-FAILURES TO WS-BEFORE
+           PERFORM TEST-ENVIRONMENT
+           IF WS-FAILURES > WS-BEFORE DISPLAY "FAIL AGENT ENV"
+           END-IF
+           IF WS-FAILURES = ZERO
+               DISPLAY "PASS AGENT"
+               MOVE ZERO TO RETURN-CODE
+           ELSE
+               DISPLAY "FAIL AGENT"
+               MOVE 1 TO RETURN-CODE
+           END-IF
+           GOBACK.
+
+       TEST-HAPPY-PATH.
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-OK
+               ADD 1 TO WS-FAILURES
+           END-IF
+           IF FR-CALL-COUNT NOT = 2 OR
+              FR-CONTINUE-COUNT NOT = 1 OR
+              FR-DESTROY-COUNT NOT = 1 OR
+              FR-VALID NOT = FLAG-ON OR
+              FR-KEY-SEEN NOT = FLAG-ON OR
+              FR-KEY-ENV-ABSENT NOT = FLAG-ON OR
+              FR-DESTROY-VALID NOT = FLAG-ON
+               ADD 1 TO WS-FAILURES
+           END-IF
+           IF FS-CALL-COUNT NOT = 1 OR FS-VALID NOT = FLAG-ON
+               ADD 1 TO WS-FAILURES
+           END-IF
+           IF FO-STDOUT-LENGTH NOT = 10 OR
+              FO-STDOUT(1:10) NOT = "agent done"
+               ADD 1 TO WS-FAILURES
+           END-IF
+           IF FO-STDERR-LENGTH NOT = 148 OR
+              FO-STDERR(1:148) NOT = C-HAPPY-STDERR OR
+              FO-STDERR(1:22) NOT = "COBOLLM shell command:" OR
+              FO-STDERR(24:9) NOT = "printf ok" OR
+              FO-STDERR(34:21) NOT = "COBOLLM shell result:" OR
+              FO-STDERR(56:11) NOT = "status=exit" OR
+              FO-STDERR(68:11) NOT = "exit_code=0" OR
+              FO-STDERR(80:11) NOT = "signal=none" OR
+              FO-STDERR(92:15) NOT = "truncated=false" OR
+              FO-STDERR(108:19) NOT = "encoding_loss=false" OR
+              FO-STDERR(128:7) NOT = "output:" OR
+              FO-STDERR(136:12) NOT = "shell output"
+               ADD 1 TO WS-FAILURES
+           END-IF
+           IF FO-STDERR(23:1) NOT = X"0A" OR
+              FO-STDERR(33:1) NOT = X"0A" OR
+              FO-STDERR(55:1) NOT = X"0A" OR
+              FO-STDERR(67:1) NOT = X"0A" OR
+              FO-STDERR(79:1) NOT = X"0A" OR
+              FO-STDERR(91:1) NOT = X"0A" OR
+              FO-STDERR(107:1) NOT = X"0A" OR
+              FO-STDERR(127:1) NOT = X"0A" OR
+              FO-STDERR(135:1) NOT = X"0A" OR
+              FO-STDERR(148:1) NOT = X"0A"
+               ADD 1 TO WS-FAILURES
+           END-IF
+           MOVE ZERO TO WS-TALLY
+           INSPECT FO-STDOUT TALLYING WS-TALLY FOR ALL
+               "test-secret"
+           INSPECT FO-STDERR TALLYING WS-TALLY FOR ALL
+               "test-secret"
+           IF WS-TALLY NOT = ZERO ADD 1 TO WS-FAILURES END-IF
+           CALL "TSTGETENV" USING BY REFERENCE WS-KEY-NAME
+               BY REFERENCE WS-ENV-PTR
+           IF WS-ENV-PTR NOT = NULL ADD 1 TO WS-FAILURES END-IF
+           CALL "TSTGETENV" USING BY REFERENCE WS-SENTINEL-NAME
+               BY REFERENCE WS-ENV-PTR
+           IF WS-ENV-PTR = NULL
+               ADD 1 TO WS-FAILURES
+           ELSE
+               SET ADDRESS OF WS-ENV-VIEW TO WS-ENV-PTR
+               IF WS-ENV-VIEW(1:5) NOT = WS-SENTINEL-VALUE
+                   ADD 1 TO WS-FAILURES
+               END-IF
+           END-IF
+           IF CLI-PLATFORM NOT = PLATFORM-GNU OR
+              CLI-ARG-COUNT NOT = 1 OR
+              CLI-TASK-LENGTH NOT = 5 OR
+              CLI-TASK(1:5) NOT = "do it"
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-COMMAND-ENCODING.
+           PERFORM RESET-FAKES
+           MOVE 3 TO FR-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-OK OR
+              FR-VALID NOT = FLAG-ON OR
+              FR-CONTINUE-COUNT NOT = 1 OR
+              FS-CALL-COUNT NOT = ZERO OR
+              FR-DESTROY-COUNT NOT = 1 OR
+              FR-DESTROY-VALID NOT = FLAG-ON OR
+              FO-CALL-COUNT NOT = 8 OR
+              FO-STDERR-LENGTH NOT = 184 OR
+              FO-STDERR(1:184) NOT = C-ENCODING-STDERR
+               ADD 1 TO WS-FAILURES
+           END-IF
+           MOVE ZERO TO WS-TALLY
+           INSPECT FO-STDERR TALLYING WS-TALLY FOR ALL
+               "test-secret"
+           IF WS-TALLY NOT = ZERO ADD 1 TO WS-FAILURES END-IF
+           PERFORM RESET-FAKES
+           MOVE 11 TO FR-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-OK OR
+              FR-VALID NOT = FLAG-ON OR
+              FS-CALL-COUNT NOT = ZERO OR
+              FO-STDERR-LENGTH NOT = 184 OR
+              FO-STDERR(1:184) NOT = C-ENCODING-STDERR
+               ADD 1 TO WS-FAILURES
+           END-IF
+           PERFORM TEST-COMMAND-OUTPUT-FAILURES.
+
+       TEST-ZOS-UNREPRESENTABLE.
+           INITIALIZE TEXT-PARM
+           MOVE TEXT-UTF8-STRICT TO TP-OPERATION
+           SET TP-INPUT-PTR TO ADDRESS OF WS-UNREPRESENTABLE
+           MOVE 4 TO TP-INPUT-LENGTH
+           SET TP-OUTPUT-PTR TO ADDRESS OF WS-CONVERSION-OUTPUT
+           MOVE 16 TO TP-OUTPUT-CAPACITY
+           CALL "NATUTF8" USING TEXT-PARM
+           IF TP-STATUS = STATUS-OK EXIT PARAGRAPH END-IF
+           IF TP-STATUS NOT = STATUS-TEXT-INVALID
+               ADD 1 TO WS-FAILURES
+               EXIT PARAGRAPH
+           END-IF
+           PERFORM RESET-FAKES
+           MOVE 12 TO FR-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-ZOS-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-OK OR
+              FR-VALID NOT = FLAG-ON OR
+              FR-CONTINUE-COUNT NOT = 1 OR
+              FS-CALL-COUNT NOT = ZERO OR
+              FO-CALL-COUNT NOT = 8 OR
+              FO-STDERR-LENGTH NOT = 184 OR
+              FO-STDERR(1:184) NOT = C-ZOS-ENCODING-STDERR
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-COMMAND-OUTPUT-FAILURES.
+           PERFORM VARYING WS-TALLY FROM 1 BY 1 UNTIL WS-TALLY > 7
+               PERFORM RESET-FAKES
+               MOVE 3 TO FR-MODE
+               MOVE WS-TALLY TO FO-FAIL-CALL
+               PERFORM SET-HTTPS-ENV
+               PERFORM SETUP-GNU-CLI
+               CALL "COBOLLM" USING CLI-PARM
+               IF CLI-EXIT-CODE NOT = EXIT-INTERNAL OR
+                  FR-CONTINUE-COUNT NOT = ZERO OR
+                  FS-CALL-COUNT NOT = ZERO OR
+                  FR-DESTROY-COUNT NOT = 1 OR
+                  FR-DESTROY-VALID NOT = FLAG-ON
+                   ADD 1 TO WS-FAILURES
+               END-IF
+               EVALUATE WS-TALLY
+                   WHEN 1 MOVE 0 TO WS-PREFIX-LENGTH
+                   WHEN 2 MOVE 22 TO WS-PREFIX-LENGTH
+                   WHEN 3 MOVE 23 TO WS-PREFIX-LENGTH
+                   WHEN 4 MOVE 60 TO WS-PREFIX-LENGTH
+                   WHEN 5 MOVE 61 TO WS-PREFIX-LENGTH
+                   WHEN 6 MOVE 82 TO WS-PREFIX-LENGTH
+                   WHEN 7 MOVE 83 TO WS-PREFIX-LENGTH
+               END-EVALUATE
+               MOVE LOW-VALUES TO WS-EXPECTED-STDERR
+               IF WS-PREFIX-LENGTH > ZERO
+                   MOVE C-ENCODING-STDERR(1:WS-PREFIX-LENGTH) TO
+                       WS-EXPECTED-STDERR(1:WS-PREFIX-LENGTH)
+               END-IF
+               MOVE C-OUTPUT-FAIL-DIAG TO WS-EXPECTED-STDERR(
+                   WS-PREFIX-LENGTH + 1:39)
+               COMPUTE WS-EXPECTED-LENGTH = WS-PREFIX-LENGTH + 39
+               IF FO-CALL-COUNT NOT = WS-TALLY + 2 OR
+                  FO-STDOUT-LENGTH NOT = ZERO OR
+                  FO-STDERR-LENGTH NOT = WS-EXPECTED-LENGTH OR
+                  FO-STDERR(1:WS-EXPECTED-LENGTH) NOT =
+                      WS-EXPECTED-STDERR(1:WS-EXPECTED-LENGTH)
+                   ADD 1 TO WS-FAILURES
+               END-IF
+               MOVE ZERO TO WS-BEFORE
+               INSPECT FO-STDOUT TALLYING WS-BEFORE FOR ALL
+                   "test-secret"
+               INSPECT FO-STDERR TALLYING WS-BEFORE FOR ALL
+                   "test-secret"
+               IF WS-BEFORE NOT = ZERO ADD 1 TO WS-FAILURES END-IF
+           END-PERFORM.
+
+       TEST-ACTIVITY-NEWLINES.
+           PERFORM RESET-FAKES
+           MOVE 8 TO FR-MODE FS-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-OK OR
+              FR-VALID NOT = FLAG-ON OR
+              FS-VALID NOT = FLAG-ON OR
+              FO-STDERR-LENGTH NOT = 148 OR
+              FO-STDERR(1:148) NOT = C-HAPPY-STDERR OR
+              FO-STDERR(33:1) NOT = X"0A" OR
+              FO-STDERR(148:1) NOT = X"0A"
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-ACTIVITY-ENCODING.
+           PERFORM RESET-FAKES
+           MOVE 9 TO FR-MODE FS-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-OK OR
+              FR-VALID NOT = FLAG-ON OR
+              FS-VALID NOT = FLAG-ON OR
+              FO-STDERR-LENGTH NOT = 138 OR
+              FO-STDERR(1:138) NOT = C-LOSS-STDERR OR
+              FO-STDERR(108:18) NOT = "encoding_loss=true" OR
+              FO-STDERR(135:3) NOT = X"EFBFBD" OR
+              FO-STDERR(138:1) NOT = X"0A"
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-ACTIVITY-SIGNAL.
+           PERFORM RESET-FAKES
+           MOVE 10 TO FR-MODE FS-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-OK OR
+              FR-VALID NOT = FLAG-ON OR
+              FS-VALID NOT = FLAG-ON OR
+              FO-STDERR-LENGTH NOT = 150 OR
+              FO-STDERR(1:150) NOT = C-SIGNAL-STDERR
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-SHELL-FAILURE.
+           PERFORM RESET-FAKES
+           MOVE 1 TO FS-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-SHELL OR
+              FS-CALL-COUNT NOT = 1 OR
+              FR-CONTINUE-COUNT NOT = ZERO OR
+              FR-DESTROY-COUNT NOT = 1 OR
+              FR-DESTROY-VALID NOT = FLAG-ON
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-RESPONSES-FAILURES.
+           PERFORM RESET-FAKES
+           MOVE 5 TO FR-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-NETWORK OR
+              FR-CALL-COUNT NOT = 1 OR
+              FR-DESTROY-COUNT NOT = 1 OR
+              FR-DESTROY-VALID NOT = FLAG-ON
+               ADD 1 TO WS-FAILURES
+           END-IF
+           PERFORM RESET-FAKES
+           MOVE 6 TO FR-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-PROTOCOL OR
+              FO-STDERR-LENGTH NOT = 35 OR
+              FO-STDERR(1:34) NOT =
+                  "COBOLLM: protocol: HTTP status 429"
+               ADD 1 TO WS-FAILURES
+           END-IF
+           PERFORM RESET-FAKES
+           MOVE 7 TO FR-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-CAPACITY OR
+              FR-DESTROY-COUNT NOT = 1
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-FINAL-REPLACEMENT.
+           PERFORM RESET-FAKES
+           MOVE 4 TO FR-MODE
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-OK OR
+              FO-STDOUT-LENGTH NOT = 5 OR
+              FO-STDOUT(1:5) NOT = X"41EFBFBD42" OR
+              FO-STDERR-LENGTH NOT = 92 OR
+              FO-STDERR(92:1) NOT = X"0A"
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-DEFAULT-URL.
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           CALL "TSTUNSETENV" USING BY REFERENCE WS-URL-NAME
+               RETURNING WS-NATIVE-RESULT
+           PERFORM SETUP-ZOS-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-OK OR
+              FR-DEFAULT-URL NOT = FLAG-ON
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-PLAINTEXT-GNU.
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTP-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-OK OR
+              FR-CALL-COUNT NOT = 2 OR
+              FO-STDERR-LENGTH NOT = 245 OR
+              FO-STDERR(1:42) NOT =
+                  "COBOLLM: warning: HTTP sends the API key, " OR
+              FO-STDERR(43:43) NOT =
+                  "task, commands, and command output without " OR
+              FO-STDERR(86:11) NOT = "encryption." OR
+              FO-STDERR(97:1) NOT = X"0A"
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-PLAINTEXT-ZOS.
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTP-ENV
+           PERFORM SETUP-ZOS-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-USAGE OR
+              FR-CALL-COUNT NOT = ZERO OR
+              FS-CALL-COUNT NOT = ZERO OR
+              FO-STDERR-LENGTH NOT = 49 OR
+              FO-STDERR(1:48) NOT =
+                  "COBOLLM: config: z/OS requires an https base URL" OR
+              FO-STDERR(49:1) NOT = X"25"
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-OUTPUT-FAILURE.
+           PERFORM RESET-FAKES
+           MOVE 1 TO FO-FAIL-CALL
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-INTERNAL OR
+              FS-CALL-COUNT NOT = ZERO OR
+              FR-CONTINUE-COUNT NOT = ZERO OR
+              FR-DESTROY-COUNT NOT = 1 OR
+              FR-DESTROY-VALID NOT = FLAG-ON
+               ADD 1 TO WS-FAILURES
+           END-IF
+           PERFORM RESET-FAKES
+           MOVE 5 TO FO-FAIL-CALL
+           PERFORM SET-HTTPS-ENV
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-INTERNAL OR
+              FS-CALL-COUNT NOT = 1 OR
+              FR-CONTINUE-COUNT NOT = ZERO OR
+              FR-DESTROY-COUNT NOT = 1 OR
+              FR-DESTROY-VALID NOT = FLAG-ON
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-MISSING-KEY.
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           CALL "TSTUNSETENV" USING BY REFERENCE WS-KEY-NAME
+               RETURNING WS-NATIVE-RESULT
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-USAGE OR
+              FR-CALL-COUNT NOT = ZERO OR
+              FO-STDERR-LENGTH NOT = 54 OR
+              FO-STDERR(1:43) NOT =
+                  "COBOLLM: config: OPENAI_API_KEY is missing " OR
+              FO-STDERR(44:10) NOT = "or invalid"
+               ADD 1 TO WS-FAILURES
+           END-IF
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           CALL "TSTSETENV" USING BY REFERENCE WS-KEY-NAME
+               BY REFERENCE WS-EMPTY-VALUE
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           IF WS-NATIVE-RESULT NOT = ZERO
+               ADD 1 TO WS-FAILURES
+           END-IF
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = EXIT-USAGE OR
+              FR-CALL-COUNT NOT = ZERO OR
+              FO-STDERR-LENGTH NOT = 54
+              ADD 1 TO WS-FAILURES
+           END-IF.
+
+       TEST-ENVIRONMENT.
+           PERFORM TEST-MODEL-ENV
+           PERFORM TEST-KEY-ENV
+           PERFORM TEST-URL-ENV.
+
+       TEST-MODEL-ENV.
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           CALL "TSTUNSETENV" USING BY REFERENCE WS-MODEL-NAME
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-USAGE TO WS-EXPECTED-EXIT
+           MOVE ZERO TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           CALL "TSTSETENV" USING BY REFERENCE WS-MODEL-NAME
+               BY REFERENCE WS-EMPTY-VALUE
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-USAGE TO WS-EXPECTED-EXIT
+           MOVE ZERO TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           MOVE LOW-VALUES TO WS-LONG-ENV
+           MOVE ALL "m" TO WS-LONG-ENV(1:255)
+           CALL "TSTSETENV" USING BY REFERENCE WS-MODEL-NAME
+               BY REFERENCE WS-LONG-ENV
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-OK TO WS-EXPECTED-EXIT
+           MOVE 2 TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           MOVE LOW-VALUES TO WS-LONG-ENV
+           MOVE ALL "m" TO WS-LONG-ENV(1:256)
+           CALL "TSTSETENV" USING BY REFERENCE WS-MODEL-NAME
+               BY REFERENCE WS-LONG-ENV
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-OK TO WS-EXPECTED-EXIT
+           MOVE 2 TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           MOVE LOW-VALUES TO WS-LONG-ENV
+           MOVE ALL "m" TO WS-LONG-ENV(1:257)
+           CALL "TSTSETENV" USING BY REFERENCE WS-MODEL-NAME
+               BY REFERENCE WS-LONG-ENV
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-CAPACITY TO WS-EXPECTED-EXIT
+           MOVE ZERO TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE.
+
+       TEST-KEY-ENV.
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           CALL "TSTUNSETENV" USING BY REFERENCE WS-KEY-NAME
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-USAGE TO WS-EXPECTED-EXIT
+           MOVE ZERO TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           CALL "TSTSETENV" USING BY REFERENCE WS-KEY-NAME
+               BY REFERENCE WS-EMPTY-VALUE
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-USAGE TO WS-EXPECTED-EXIT
+           MOVE ZERO TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           MOVE LOW-VALUES TO WS-LONG-ENV
+           MOVE ALL "k" TO WS-LONG-ENV(1:8191)
+           CALL "TSTSETENV" USING BY REFERENCE WS-KEY-NAME
+               BY REFERENCE WS-LONG-ENV
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-OK TO WS-EXPECTED-EXIT
+           MOVE 2 TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           MOVE LOW-VALUES TO WS-LONG-ENV
+           MOVE ALL "k" TO WS-LONG-ENV(1:8192)
+           CALL "TSTSETENV" USING BY REFERENCE WS-KEY-NAME
+               BY REFERENCE WS-LONG-ENV
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-OK TO WS-EXPECTED-EXIT
+           MOVE 2 TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           MOVE ALL "k" TO WS-LONG-ENV(1:8193)
+           MOVE LOW-VALUE TO WS-LONG-ENV(8194:1)
+           CALL "TSTSETENV" USING BY REFERENCE WS-KEY-NAME
+               BY REFERENCE WS-LONG-ENV
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-CAPACITY TO WS-EXPECTED-EXIT
+           MOVE ZERO TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           CALL "TSTSETENV" USING BY REFERENCE WS-KEY-NAME
+               BY REFERENCE WS-BAD-KEY
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-USAGE TO WS-EXPECTED-EXIT
+           MOVE ZERO TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE.
+
+       TEST-URL-ENV.
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           CALL "TSTUNSETENV" USING BY REFERENCE WS-URL-NAME
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-OK TO WS-EXPECTED-EXIT
+           MOVE 2 TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           CALL "TSTSETENV" USING BY REFERENCE WS-URL-NAME
+               BY REFERENCE WS-EMPTY-VALUE
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-USAGE TO WS-EXPECTED-EXIT
+           MOVE ZERO TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           MOVE LOW-VALUES TO WS-LONG-ENV
+           MOVE "https://example/" TO WS-LONG-ENV(1:16)
+           MOVE ALL "a" TO WS-LONG-ENV(17:2031)
+           CALL "TSTSETENV" USING BY REFERENCE WS-URL-NAME
+               BY REFERENCE WS-LONG-ENV
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-OK TO WS-EXPECTED-EXIT
+           MOVE 2 TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           MOVE LOW-VALUES TO WS-LONG-ENV
+           MOVE "https://example/" TO WS-LONG-ENV(1:16)
+           MOVE ALL "a" TO WS-LONG-ENV(17:2032)
+           CALL "TSTSETENV" USING BY REFERENCE WS-URL-NAME
+               BY REFERENCE WS-LONG-ENV
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-OK TO WS-EXPECTED-EXIT
+           MOVE 2 TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE
+
+           PERFORM RESET-FAKES
+           PERFORM SET-HTTPS-ENV
+           MOVE LOW-VALUES TO WS-LONG-ENV
+           MOVE "https://example/" TO WS-LONG-ENV(1:16)
+           MOVE ALL "a" TO WS-LONG-ENV(17:2033)
+           CALL "TSTSETENV" USING BY REFERENCE WS-URL-NAME
+               BY REFERENCE WS-LONG-ENV
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           MOVE EXIT-CAPACITY TO WS-EXPECTED-EXIT
+           MOVE ZERO TO WS-EXPECTED-CALLS
+           PERFORM RUN-ENV-CASE.
+
+       RUN-ENV-CASE.
+           IF WS-NATIVE-RESULT NOT = ZERO
+               ADD 1 TO WS-FAILURES
+           END-IF
+           PERFORM SETUP-GNU-CLI
+           CALL "COBOLLM" USING CLI-PARM
+           IF CLI-EXIT-CODE NOT = WS-EXPECTED-EXIT OR
+              FR-CALL-COUNT NOT = WS-EXPECTED-CALLS OR
+              FS-CALL-COUNT NOT = WS-EXPECTED-CALLS / 2
+               ADD 1 TO WS-FAILURES
+           END-IF
+           IF WS-EXPECTED-CALLS > ZERO AND
+              FR-KEY-ENV-ABSENT NOT = FLAG-ON
+               ADD 1 TO WS-FAILURES
+           END-IF
+           CALL "TSTGETENV" USING BY REFERENCE WS-KEY-NAME
+               BY REFERENCE WS-ENV-PTR
+           IF WS-ENV-PTR NOT = NULL
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       RESET-FAKES.
+           INITIALIZE FAKE-RESP-CONTROL
+           INITIALIZE FAKE-SHELL-CONTROL
+           INITIALIZE FAKE-OUTPUT-CONTROL.
+
+       SET-HTTPS-ENV.
+           PERFORM SET-COMMON-ENV
+           CALL "TSTSETENV" USING BY REFERENCE WS-URL-NAME
+               BY REFERENCE WS-HTTPS-VALUE
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           IF WS-NATIVE-RESULT NOT = ZERO
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       SET-HTTP-ENV.
+           PERFORM SET-COMMON-ENV
+           CALL "TSTSETENV" USING BY REFERENCE WS-URL-NAME
+               BY REFERENCE WS-HTTP-VALUE
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           IF WS-NATIVE-RESULT NOT = ZERO
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       SET-COMMON-ENV.
+           CALL "TSTSETENV" USING BY REFERENCE WS-KEY-NAME
+               BY REFERENCE WS-KEY-VALUE
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           IF WS-NATIVE-RESULT NOT = ZERO
+               ADD 1 TO WS-FAILURES
+           END-IF
+           CALL "TSTSETENV" USING BY REFERENCE WS-MODEL-NAME
+               BY REFERENCE WS-MODEL-VALUE
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           IF WS-NATIVE-RESULT NOT = ZERO
+               ADD 1 TO WS-FAILURES
+           END-IF
+           CALL "TSTSETENV" USING BY REFERENCE WS-SENTINEL-NAME
+               BY REFERENCE WS-SENTINEL-VALUE
+               BY REFERENCE WS-OVERWRITE
+               RETURNING WS-NATIVE-RESULT
+           IF WS-NATIVE-RESULT NOT = ZERO
+               ADD 1 TO WS-FAILURES
+           END-IF.
+
+       SETUP-GNU-CLI.
+           INITIALIZE CLI-PARM
+           MOVE STATUS-OK TO CLI-STATUS
+           MOVE PLATFORM-GNU TO CLI-PLATFORM
+           MOVE 1 TO CLI-ARG-COUNT
+           MOVE 5 TO CLI-TASK-LENGTH
+           MOVE "do it" TO CLI-TASK(1:5)
+           MOVE 99 TO CLI-EXIT-CODE.
+
+       SETUP-ZOS-CLI.
+           PERFORM SETUP-GNU-CLI
+           MOVE PLATFORM-ZOS TO CLI-PLATFORM.
+
+       END PROGRAM TSTAGENT.

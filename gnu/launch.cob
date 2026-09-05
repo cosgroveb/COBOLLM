@@ -1,0 +1,37 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. GNULNCHR.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       COPY LIMITS.
+       COPY CLIPARM.
+       01 WS-RAW-ARG              PIC X(131072).
+       01 WS-RAW-LENGTH           PIC S9(9) COMP-5.
+
+       PROCEDURE DIVISION.
+           INITIALIZE CLI-PARM
+           MOVE PLATFORM-GNU TO CLI-PLATFORM
+           MOVE SPACES TO CLI-TASK WS-RAW-ARG
+           ACCEPT CLI-ARG-COUNT FROM ARGUMENT-NUMBER
+           IF CLI-ARG-COUNT = 1
+               ACCEPT WS-RAW-ARG FROM ARGUMENT-VALUE
+               MOVE LIMIT-GNU-ARG-STAGING TO WS-RAW-LENGTH
+               PERFORM UNTIL WS-RAW-LENGTH = ZERO OR
+                   WS-RAW-ARG(WS-RAW-LENGTH:1) NOT = SPACE
+                   SUBTRACT 1 FROM WS-RAW-LENGTH
+               END-PERFORM
+               IF WS-RAW-LENGTH > LIMIT-TASK
+                   MOVE STATUS-CAPACITY TO CLI-STATUS
+               ELSE
+                   MOVE WS-RAW-LENGTH TO CLI-TASK-LENGTH
+                   IF WS-RAW-LENGTH > ZERO
+                       MOVE WS-RAW-ARG(1:WS-RAW-LENGTH) TO
+                           CLI-TASK(1:WS-RAW-LENGTH)
+                   END-IF
+               END-IF
+           END-IF
+           CALL "COBOLLM" USING CLI-PARM
+           MOVE CLI-EXIT-CODE TO RETURN-CODE
+           GOBACK.
+
+       END PROGRAM GNULNCHR.

@@ -1,0 +1,189 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. TSTZTLS.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       COPY LIMITS.
+       COPY NETPARM.
+       COPY NETNAT.
+       COPY SHLPARM.
+       COPY TXTPARM.
+       01 WS-CONNECT-NAME.
+           05 FILLER PIC X(24) VALUE "COBOLLM_TLS_CONNECT_HOST".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01 WS-EXPECT-NAME.
+           05 FILLER PIC X(18) VALUE "COBOLLM_TLS_EXPECT".
+           05 FILLER PIC X VALUE LOW-VALUE.
+       01 WS-ENV-PTR USAGE POINTER.
+       01 WS-ENV-LENGTH PIC S9(9) COMP-5.
+       01 WS-NATIVE PIC X(254).
+       01 WS-CONNECT PIC X(253).
+       01 WS-CONNECT-LENGTH PIC S9(9) COMP-5.
+       01 WS-EXPECT-SUCCESS PIC X.
+       01 WS-FAILED PIC X.
+       01 WS-SIGNAL-INSTALLED PIC X VALUE X"00".
+       01 WS-NULL USAGE POINTER.
+       01 WS-SIGNAL-RESULT PIC S9(9) COMP-5.
+       01 WS-SIGNAL-COMMAND PIC X(29) VALUE
+           "kill -PIPE $$; printf PIPE-OK".
+       01 WS-SIGNAL-OUTPUT PIC X(16).
+
+       LINKAGE SECTION.
+       01 WS-ENV-VIEW PIC X(254).
+
+       PROCEDURE DIVISION.
+           MOVE FLAG-OFF TO WS-FAILED WS-EXPECT-SUCCESS
+           SET WS-ENV-PTR TO NULL
+           CALL "getenv" USING BY REFERENCE WS-EXPECT-NAME
+               RETURNING WS-ENV-PTR
+           IF WS-ENV-PTR = NULL
+               MOVE FLAG-ON TO WS-FAILED
+           ELSE
+               SET ADDRESS OF WS-ENV-VIEW TO WS-ENV-PTR
+               IF WS-ENV-VIEW(1:7) = "SUCCESS"
+                   MOVE FLAG-ON TO WS-EXPECT-SUCCESS
+               ELSE
+                   IF WS-ENV-VIEW(1:7) NOT = "FAILURE"
+                       MOVE FLAG-ON TO WS-FAILED
+                   END-IF
+               END-IF
+           END-IF
+           IF WS-FAILED = FLAG-OFF
+               MOVE WS-CONNECT-NAME TO WS-NATIVE(1:25)
+               PERFORM READ-HOST
+               MOVE TP-OUTPUT-LENGTH TO WS-CONNECT-LENGTH
+               MOVE WS-NATIVE(1:253) TO WS-CONNECT
+           END-IF
+           IF WS-FAILED = FLAG-OFF
+               PERFORM INSTALL-IGNORED-SIGPIPE
+           END-IF
+           IF WS-FAILED = FLAG-OFF
+               INITIALIZE NET-PARM
+               MOVE NET-OPEN TO NP-OPERATION
+               MOVE NET-TLS TO NP-SCHEME
+               SET NP-CONNECT-HOST-PTR TO ADDRESS OF WS-CONNECT
+               MOVE WS-CONNECT-LENGTH TO NP-CONNECT-HOST-LENGTH
+               SET NP-VERIFY-HOST-PTR TO ADDRESS OF WS-CONNECT
+               MOVE WS-CONNECT-LENGTH TO NP-VERIFY-HOST-LENGTH
+               MOVE 443 TO NP-PORT
+               CALL "NETIO" USING NET-PARM
+               IF WS-EXPECT-SUCCESS = FLAG-ON
+                   IF NP-STATUS = STATUS-OK
+                       INITIALIZE NET-PARM
+                       MOVE NET-CLOSE TO NP-OPERATION
+                       CALL "NETIO" USING NET-PARM
+                       IF NP-STATUS NOT = STATUS-OK
+                           MOVE FLAG-ON TO WS-FAILED
+                       END-IF
+                   ELSE
+                       MOVE FLAG-ON TO WS-FAILED
+                   END-IF
+               ELSE
+                   IF NP-STATUS NOT = STATUS-NETWORK
+                       MOVE FLAG-ON TO WS-FAILED
+                       IF NP-STATUS = STATUS-OK
+                           INITIALIZE NET-PARM
+                           MOVE NET-CLOSE TO NP-OPERATION
+                           CALL "NETIO" USING NET-PARM
+                       END-IF
+                   END-IF
+               END-IF
+           END-IF
+           PERFORM TEST-RESTORED-SIGPIPE
+           PERFORM RESTORE-ORIGINAL-SIGPIPE
+           IF WS-FAILED = FLAG-OFF
+               DISPLAY "PASS ZOS TLS"
+               MOVE ZERO TO RETURN-CODE
+           ELSE
+               DISPLAY "FAIL ZOS TLS"
+               MOVE 1 TO RETURN-CODE
+           END-IF
+           GOBACK.
+
+       INSTALL-IGNORED-SIGPIPE.
+           SET WS-NULL TO NULL
+           MOVE FLAG-OFF TO WS-SIGNAL-INSTALLED
+           MOVE LOW-VALUES TO ZN-NEW-ACTION ZN-SAVED-ACTION
+           CALL "sigaction" USING BY VALUE ZN-SIGPIPE
+               BY VALUE WS-NULL BY REFERENCE ZN-SAVED-ACTION
+               RETURNING WS-SIGNAL-RESULT
+           IF WS-SIGNAL-RESULT NOT = ZERO
+               MOVE FLAG-ON TO WS-FAILED
+               EXIT PARAGRAPH
+           END-IF
+           CALL "sigemptyset" USING BY REFERENCE ZN-NEW-MASK
+               RETURNING WS-SIGNAL-RESULT
+           IF WS-SIGNAL-RESULT NOT = ZERO
+               MOVE FLAG-ON TO WS-FAILED
+               EXIT PARAGRAPH
+           END-IF
+           SET ZN-NEW-HANDLER TO ZN-SIG-IGN
+           CALL "sigaction" USING BY VALUE ZN-SIGPIPE
+               BY REFERENCE ZN-NEW-ACTION BY VALUE WS-NULL
+               RETURNING WS-SIGNAL-RESULT
+           IF WS-SIGNAL-RESULT = ZERO
+               MOVE FLAG-ON TO WS-SIGNAL-INSTALLED
+           ELSE
+               MOVE FLAG-ON TO WS-FAILED
+           END-IF.
+
+       TEST-RESTORED-SIGPIPE.
+           IF WS-SIGNAL-INSTALLED NOT = FLAG-ON EXIT PARAGRAPH END-IF
+           MOVE LOW-VALUES TO WS-SIGNAL-OUTPUT
+           INITIALIZE SHELL-PARM
+           SET SP-COMMAND-PTR TO ADDRESS OF WS-SIGNAL-COMMAND
+           MOVE 29 TO SP-COMMAND-LENGTH
+           SET SP-OUTPUT-PTR TO ADDRESS OF WS-SIGNAL-OUTPUT
+           MOVE 16 TO SP-OUTPUT-CAPACITY
+           CALL "SHELL" USING SHELL-PARM
+           IF SP-STATUS NOT = STATUS-OK OR
+              SP-RESULT-KIND NOT = SHELL-EXIT OR
+              SP-EXIT-CODE NOT = ZERO OR
+              SP-OUTPUT-LENGTH NOT = 7 OR
+              WS-SIGNAL-OUTPUT(1:7) NOT = "PIPE-OK"
+               MOVE FLAG-ON TO WS-FAILED
+           END-IF.
+
+       RESTORE-ORIGINAL-SIGPIPE.
+           IF WS-SIGNAL-INSTALLED = FLAG-ON
+               CALL "sigaction" USING BY VALUE ZN-SIGPIPE
+                   BY REFERENCE ZN-SAVED-ACTION BY VALUE WS-NULL
+                   RETURNING WS-SIGNAL-RESULT
+               IF WS-SIGNAL-RESULT NOT = ZERO
+                   MOVE FLAG-ON TO WS-FAILED
+               END-IF
+               MOVE FLAG-OFF TO WS-SIGNAL-INSTALLED
+           END-IF.
+
+       READ-HOST.
+           CALL "getenv" USING BY REFERENCE WS-NATIVE
+               RETURNING WS-ENV-PTR
+           MOVE LOW-VALUES TO WS-NATIVE
+           IF WS-ENV-PTR = NULL
+               MOVE FLAG-ON TO WS-FAILED
+               EXIT PARAGRAPH
+           END-IF
+           SET ADDRESS OF WS-ENV-VIEW TO WS-ENV-PTR
+           MOVE ZERO TO WS-ENV-LENGTH
+           PERFORM VARYING WS-ENV-LENGTH FROM 1 BY 1
+               UNTIL WS-ENV-LENGTH > 253 OR
+                     WS-ENV-VIEW(WS-ENV-LENGTH:1) = LOW-VALUE
+               CONTINUE
+           END-PERFORM
+           IF WS-ENV-LENGTH > 253
+               MOVE FLAG-ON TO WS-FAILED
+               EXIT PARAGRAPH
+           END-IF
+           SUBTRACT 1 FROM WS-ENV-LENGTH
+           INITIALIZE TEXT-PARM
+           MOVE TEXT-NATIVE-STRICT TO TP-OPERATION
+           SET TP-INPUT-PTR TO WS-ENV-PTR
+           MOVE WS-ENV-LENGTH TO TP-INPUT-LENGTH
+           SET TP-OUTPUT-PTR TO ADDRESS OF WS-NATIVE
+           MOVE 253 TO TP-OUTPUT-CAPACITY
+           CALL "NATUTF8" USING TEXT-PARM
+           IF TP-STATUS NOT = STATUS-OK OR TP-OUTPUT-LENGTH < 1
+               MOVE FLAG-ON TO WS-FAILED
+           END-IF.
+
+       END PROGRAM TSTZTLS.
