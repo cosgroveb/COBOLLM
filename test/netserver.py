@@ -107,12 +107,14 @@ class Peer(threading.Thread):
         tls_context: ssl.SSLContext | None = None,
         connections: int = 1,
         reset: bool = False,
+        expect_tls_eof: bool = False,
     ) -> None:
         super().__init__(daemon=True)
         self.response = response
         self.tls_context = tls_context
         self.connections = connections
         self.reset = reset
+        self.expect_tls_eof = expect_tls_eof
         self.application_bytes: list[bytes] = []
         self.errors: list[str] = []
         self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -148,7 +150,12 @@ class Peer(threading.Thread):
                         continue
                 received = bytearray()
                 while len(received) < len(REQUEST):
-                    part = stream.recv(2)
+                    try:
+                        part = stream.recv(2)
+                    except (BrokenPipeError, ssl.SSLEOFError):
+                        if not self.expect_tls_eof:
+                            raise
+                        break
                     if not part:
                         break
                     received.extend(part)
@@ -157,10 +164,13 @@ class Peer(threading.Thread):
                     stream.sendall(bytes((byte,)))
                     time.sleep(0.001)
                 if isinstance(stream, ssl.SSLSocket):
-                    try:
-                        stream.unwrap().close()
-                    except (OSError, ssl.SSLError):
+                    if self.expect_tls_eof:
                         stream.close()
+                    else:
+                        try:
+                            stream.unwrap().close()
+                        except (OSError, ssl.SSLError):
+                            stream.close()
                 else:
                     stream.shutdown(socket.SHUT_WR)
                     stream.close()
@@ -206,7 +216,9 @@ def main() -> int:
         reset = Peer(reset=True)
         resolver_peer = Peer(connections=3) if resolver else None
         close_peer = (
-            Peer(tls_context=trusted, connections=2) if tls_close else None
+            Peer(tls_context=trusted, connections=2, expect_tls_eof=True)
+            if tls_close
+            else None
         )
         peers = [plain, tls_ok, mismatch, bad_trust, reset]
         if resolver_peer:

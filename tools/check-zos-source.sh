@@ -52,6 +52,11 @@ for helper in TSTSETENV TSTUNSETENV TSTGETENV TSTENVCOMMAND TSTCLOSE \
     grep -q "PROGRAM-ID[.] $helper[.]" zos/testnative.cob ||
         fail "z/OS test-native helper lacks $helper"
 done
+grep -Fq "'printf ENV-OK; else printf ENV-BAD; exit 1; fi'" \
+    zos/testnative.cob ||
+    fail 'z/OS environment child lacks nonzero failure exit'
+grep -q 'MOVE 118 TO TN-LENGTH' zos/testnative.cob ||
+    fail 'z/OS environment child command length differs'
 for source in test/tstzagt.cob test/tstshell.cob; do
     if grep -Eq 'CALL STATIC|BY VALUE SIZE IS' "$source"; then
         fail "$source contains GNU native-call syntax"

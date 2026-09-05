@@ -3,6 +3,10 @@ import os
 import subprocess
 import sys
 
+LIBCOB_XML_WARNING = (
+    b"Warning: program compiled against libxml 212 using older 209\n"
+)
+
 
 def run(program, args, expected_code, expected_out, expected_err):
     env = os.environ.copy()
@@ -14,7 +18,10 @@ def run(program, args, expected_code, expected_out, expected_err):
     completed = subprocess.run(
         [program, *args], env=env, capture_output=True, check=False
     )
-    actual = (completed.returncode, completed.stdout, completed.stderr)
+    stderr = completed.stderr
+    if stderr.startswith(LIBCOB_XML_WARNING):
+        stderr = stderr[len(LIBCOB_XML_WARNING) :]
+    actual = (completed.returncode, completed.stdout, stderr)
     expected = (expected_code, expected_out, expected_err)
     if actual != expected:
         raise AssertionError(

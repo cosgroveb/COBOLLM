@@ -52,9 +52,9 @@
                TN-COMMAND(1:35)
            MOVE '[ "$COBOLLM_SENTINEL" = keep ]; then ' TO
                TN-COMMAND(36:37)
-           MOVE 'printf ENV-OK; else printf ENV-BAD; fi' TO
-               TN-COMMAND(73:38)
-           MOVE 110 TO TN-LENGTH
+           MOVE 'printf ENV-OK; else printf ENV-BAD; exit 1; fi' TO
+               TN-COMMAND(73:46)
+           MOVE 118 TO TN-LENGTH
            GOBACK.
        END PROGRAM TSTENVCOMMAND.
 
