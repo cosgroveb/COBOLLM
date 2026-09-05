@@ -5,16 +5,22 @@ COBC_REAL := $(shell command -v $(COBC) 2>/dev/null)
 COBC_LIB := $(shell $(COBC) -info 2>/dev/null | awk \
 	'/^COB_LIBS/{for(i=1;i<=NF;i++)if($$i~/^-L/) \
 	{print substr($$i,3);exit}}')
-COBFLAGS := -fixed -std=ibm -Wall -Werror -I copy -I gnu/copy
+NATIVE_CFLAGS ?=
+NATIVE_LDFLAGS ?=
+NATIVE_COBFLAGS := $(foreach option,$(NATIVE_CFLAGS),-A "$(option)")
+NATIVE_LINKFLAGS := $(foreach option,$(NATIVE_LDFLAGS),-Q "$(option)")
+COBFLAGS := -fixed -std=ibm -Wall -Werror -I copy -I gnu/copy \
+	$(NATIVE_COBFLAGS)
 TESTFLAGS := $(COBFLAGS) -I test/copy
-STRICTFLAGS := -fixed -std=ibm-strict -Wall -Werror -I copy -I test/copy
+STRICTFLAGS := -fixed -std=ibm-strict -Wall -Werror -I copy -I test/copy \
+	$(NATIVE_COBFLAGS)
 # Contract LENGTH assertions intentionally provoke "is always FALSE";
 # runtime comparisons to named fields still verify repeated literals.
 CONTRACTFLAGS := $(STRICTFLAGS) -Wno-constant-numlit-expression
 comma := ,
 BOOTSTRAP_RPATH := $(if $(filter $(BOOTSTRAP_COBC),$(COBC_REAL)),\
 	-Q "-Wl$(comma)-rpath$(comma)$(COBC_LIB)")
-LINKFLAGS := -fstatic-call $(BOOTSTRAP_RPATH)
+LINKFLAGS := -fstatic-call $(BOOTSTRAP_RPATH) $(NATIVE_LINKFLAGS)
 OPENSSL_LIBS := -lssl -lcrypto
 BUILD := build
 PROGRAM := cobollm

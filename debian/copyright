@@ -1,0 +1,12 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: COBOLLM
+Upstream-Contact: Brian Cosgrove <cosgroveb@gmail.com>
+Source: Private repository
+
+Files: *
+Copyright: 2026 Brian Cosgrove <cosgroveb@gmail.com>
+License: proprietary
+ All rights reserved.
+ .
+ No permission is granted to copy, modify, or distribute this software
+ without written authorization from the copyright holder.

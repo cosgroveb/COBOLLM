@@ -1,0 +1,5 @@
+cobollm (0.1.0-1) unstable; urgency=medium
+
+  * Add initial Debian packaging.
+
+ -- Brian Cosgrove <cosgroveb@gmail.com>  Sat, 05 Sep 2026 09:32:51 +0000

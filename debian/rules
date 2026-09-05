@@ -1,0 +1,31 @@
+#!/usr/bin/make -f
+
+DEB_BUILD_MAINT_OPTIONS = hardening=+all optimize=-lto
+include /usr/share/dpkg/buildflags.mk
+
+COBOLLM_NATIVE_CFLAGS = -std=gnu17 $(CPPFLAGS) $(CFLAGS)
+COBOLLM_NATIVE_LDFLAGS = $(LDFLAGS)
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	dh_auto_build -- COBC=cobc \
+		NATIVE_CFLAGS="$(COBOLLM_NATIVE_CFLAGS)" \
+		NATIVE_LDFLAGS="$(COBOLLM_NATIVE_LDFLAGS)"
+
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	$(MAKE) COBC=cobc \
+		NATIVE_CFLAGS="$(COBOLLM_NATIVE_CFLAGS)" \
+		NATIVE_LDFLAGS="$(COBOLLM_NATIVE_LDFLAGS)" test
+endif
+
+override_dh_auto_install:
+	install -D -m 0755 cobollm debian/tmp/usr/bin/cobollm
+
+override_dh_strip:
+	dh_strip --no-automatic-dbgsym
+
+override_dh_compress:
+	dh_compress -X.md

@@ -59,7 +59,7 @@ filesystem changes do. Standard error is merged into standard output.
 - [Configuration and limits](docs/reference/configuration-and-limits.md)
 - [z/OS staging manifest](docs/reference/zos-staging-manifest.md)
 - [Architecture](docs/explanation/architecture.md)
-- [`cobollm(1)`](doc/cobollm.1)
+- Manual: `man cobollm`
 
 ## Development
 

@@ -1,0 +1,27 @@
+Source: cobollm
+Section: devel
+Priority: optional
+Maintainer: Brian Cosgrove <cosgroveb@gmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ binutils,
+ gnucobol3 (>= 3.2),
+ libc6-dev (>= 2.39),
+ libssl-dev (>= 3.0),
+ openssl,
+ pkgconf,
+ python3
+Standards-Version: 4.7.4
+Rules-Requires-Root: no
+
+Package: cobollm
+Architecture: arm64
+Depends:
+ ca-certificates,
+ libc6 (>= 2.39),
+ ${misc:Depends},
+ ${shlibs:Depends}
+Description: unsandboxed coding agent written in COBOL
+ COBOLLM talks directly to an OpenAI-compatible Responses endpoint and gives
+ the model one tool: /bin/sh. Commands run without a sandbox, permission
+ checks, or confirmation.
