@@ -1,6 +1,6 @@
 DATA_HOME := $(if $(XDG_DATA_HOME),$(XDG_DATA_HOME),$(HOME)/.local/share)
 BOOTSTRAP_COBC := $(DATA_HOME)/cobollm/gnucobol-3.2/bin/cobc
-COBC ?= cobc
+COBC ?= $(if $(wildcard $(BOOTSTRAP_COBC)),$(BOOTSTRAP_COBC),cobc)
 COBC_REAL := $(shell command -v $(COBC) 2>/dev/null)
 COBC_LIB := $(shell $(COBC) -info 2>/dev/null | awk \
 	'/^COB_LIBS/{for(i=1;i<=NF;i++)if($$i~/^-L/) \
